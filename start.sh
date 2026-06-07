@@ -94,6 +94,9 @@ start_maibot() {
     # 使用 uv run 启动，确保虚拟环境正确
     # Runner 进程会被 bot.py 的 run_runner_process 管理
     # 这里只启动 Runner，Worker 由 Runner 管理
+    export EULA_AGREE=8e6e7d647f7f82d6ea98456b73908656
+    export PRIVACY_AGREE=91e5db7659c560bc3545e63859b6ebc0
+
     nohup uv run python bot.py >> "$SCRIPT_DIR/logs/maibot.log" 2>&1 &
     local pid=$!
 
