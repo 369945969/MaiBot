@@ -3341,7 +3341,7 @@ class MaimMessageConfig(ConfigBase):
     """旧版基于WS的服务器主机地址"""
 
     ws_server_port: int = Field(
-        default=8000,
+        default=6000,
         json_schema_extra={
             "x-widget": "input",
             "x-icon": "hash",
@@ -3377,7 +3377,7 @@ class MaimMessageConfig(ConfigBase):
     """新版API Server主机地址"""
 
     api_server_port: int = Field(
-        default=8090,
+        default=6090,
         json_schema_extra={
             "x-widget": "input",
             "x-icon": "hash",
@@ -3617,7 +3617,7 @@ class WebUIConfig(ConfigBase):
     """WebUI 绑定主机地址"""
 
     port: int = Field(
-        default=8001,
+        default=6001,
         json_schema_extra={
             "x-widget": "input",
             "x-icon": "hash",

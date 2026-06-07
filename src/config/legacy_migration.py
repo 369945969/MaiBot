@@ -311,7 +311,7 @@ def migrate_legacy_bind_env_to_bot_config_dict(data: dict[str, Any]) -> Migratio
     if maim_message is not None and _migrate_env_value(maim_message, "ws_server_host", main_host_env, "127.0.0.1"):
         migrated_any = True
         reasons.append("HOST->maim_message.ws_server_host")
-    if maim_message is not None and _migrate_env_value(maim_message, "ws_server_port", main_port_env, 8000):
+    if maim_message is not None and _migrate_env_value(maim_message, "ws_server_port", main_port_env, 6000):
         migrated_any = True
         reasons.append("PORT->maim_message.ws_server_port")
 
@@ -325,7 +325,7 @@ def migrate_legacy_bind_env_to_bot_config_dict(data: dict[str, Any]) -> Migratio
     if webui is not None and _migrate_env_value(webui, "host", webui_host_env, "127.0.0.1"):
         migrated_any = True
         reasons.append("WEBUI_HOST->webui.host")
-    if webui is not None and _migrate_env_value(webui, "port", webui_port_env, 8001):
+    if webui is not None and _migrate_env_value(webui, "port", webui_port_env, 6001):
         migrated_any = True
         reasons.append("WEBUI_PORT->webui.port")
 

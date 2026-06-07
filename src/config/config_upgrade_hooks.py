@@ -341,6 +341,41 @@ def _first_existing_bool(item: dict[str, Any], keys: tuple[str, ...], default: b
     return default
 
 
+# 旧端口 → 新端口映射：将 8xxx 系列端口迁移到 6xxx 系列以避免与其他服务冲突
+_PORT_MIGRATION_MAP: dict[int, int] = {
+    8000: 6000,  # ws_server_port
+    8080: 6000,  # ws_server_port（旧版 startup_bindings fallback）
+    8090: 6090,  # api_server_port
+    8001: 6001,  # webui port
+}
+
+
+def _migrate_port_defaults_to_6xxx(data: dict[str, Any]) -> list[str]:
+    """将旧版 8xxx 系列端口迁移到 6xxx 系列。"""
+    migrated: list[str] = []
+
+    maim_msg = data.get("maim_message")
+    if isinstance(maim_msg, dict):
+        ws_port = maim_msg.get("ws_server_port")
+        if ws_port in _PORT_MIGRATION_MAP:
+            maim_msg["ws_server_port"] = _PORT_MIGRATION_MAP[ws_port]
+            migrated.append(f"maim_message.ws_server_port: {ws_port} → {_PORT_MIGRATION_MAP[ws_port]}")
+
+        api_port = maim_msg.get("api_server_port")
+        if api_port in _PORT_MIGRATION_MAP:
+            maim_msg["api_server_port"] = _PORT_MIGRATION_MAP[api_port]
+            migrated.append(f"maim_message.api_server_port: {api_port} → {_PORT_MIGRATION_MAP[api_port]}")
+
+    webui = data.get("webui")
+    if isinstance(webui, dict):
+        ui_port = webui.get("port")
+        if ui_port in _PORT_MIGRATION_MAP:
+            webui["port"] = _PORT_MIGRATION_MAP[ui_port]
+            migrated.append(f"webui.port: {ui_port} → {_PORT_MIGRATION_MAP[ui_port]}")
+
+    return migrated
+
+
 BOT_CONFIG_UPGRADE_HOOKS: tuple[ConfigUpgradeHook, ...] = (
     ConfigUpgradeHook(
         target_version="8.10.11",
@@ -371,6 +406,11 @@ BOT_CONFIG_UPGRADE_HOOKS: tuple[ConfigUpgradeHook, ...] = (
         target_version="8.12.9",
         config_names=("bot_config.toml",),
         migrate=_add_precise_expression_selection_default,
+    ),
+    ConfigUpgradeHook(
+        target_version="8.12.27",
+        config_names=("bot_config.toml",),
+        migrate=_migrate_port_defaults_to_6xxx,
     ),
 )
 MODEL_CONFIG_UPGRADE_HOOKS: tuple[ConfigUpgradeHook, ...] = ()

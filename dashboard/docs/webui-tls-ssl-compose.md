@@ -10,15 +10,15 @@
 浏览器
   -> https://maibot.example.com
   -> Caddy 容器 :80/:443
-  -> core 容器 :8001
+  -> core 容器 :6001
   -> MaiBot WebUI
 ```
 
 这意味着：
 
-1. core 不再直接对公网暴露 8001
+1. core 不再直接对公网暴露 6001
 2. Caddy 统一接管 80 和 443
-3. Caddy 通过 Docker 网络访问 core:8001
+3. Caddy 通过 Docker 网络访问 core:6001
 
 ## 2. 仓库里已经补了什么
 
@@ -39,7 +39,7 @@
 
 ```yaml
 ports:
-  - "18001:8001"
+  - "16001:6001"
 ```
 
 原因很简单：
@@ -73,7 +73,7 @@ Docker Compose 模式请使用：dashboard/docs/Caddyfile.docker.example
 
 ```caddyfile
 maibot.example.com {
-    reverse_proxy core:8001
+    reverse_proxy core:6001
 }
 ```
 
@@ -182,7 +182,7 @@ docker compose ps
 
 优先检查：
 
-1. Caddy 是否已正确反向代理到 core:8001
+1. Caddy 是否已正确反向代理到 core:6001
 2. 页面是否通过 HTTPS 打开
 3. 浏览器开发者工具里是否出现混合内容报错
 
@@ -192,7 +192,7 @@ docker compose ps
 
 ```yaml
 ports:
-  - "18001:8001"
+  - "16001:6001"
 ```
 
 那说明当前还是“宿主机明文 HTTP 暴露 WebUI”模式。迁移到 HTTPS 时建议：
@@ -200,4 +200,4 @@ ports:
 1. 先准备好域名
 2. 先改好 Caddyfile
 3. 再切换 compose 暴露方式
-4. 切换后直接以 https://域名 访问，不再继续使用 http://服务器IP:18001
+4. 切换后直接以 https://域名 访问，不再继续使用 http://服务器IP:16001

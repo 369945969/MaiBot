@@ -17,7 +17,7 @@ MaiBot 当前最合适的 TLS/SSL 方案是让反向代理终止 HTTPS，然后�
 
 当前仓库里，WebUI 的前后端是同源部署思路：
 
-1. 后端是独立的 FastAPI WebUI 服务，默认监听 127.0.0.1:8001
+1. 后端是独立的 FastAPI WebUI 服务，默认监听 127.0.0.1:6001
 2. 前端构建产物由这个 FastAPI 服务直接托管
 3. 浏览器生产模式下默认按同源访问 API
 4. 页面如果通过 HTTPS 打开，前端会自动把 WebSocket 协议切到 WSS
@@ -35,7 +35,7 @@ MaiBot 当前最合适的 TLS/SSL 方案是让反向代理终止 HTTPS，然后�
 1. 已准备一个已经解析到服务器公网 IP 的域名，例如 maibot.example.com
 2. 80 和 443 端口可以从公网访问
 3. 服务器没有其他程序占用 80 和 443
-4. WebUI 可以在本机正常打开，例如 http://127.0.0.1:8001
+4. WebUI 可以在本机正常打开，例如 http://127.0.0.1:6001
 
 如果采用 Docker Compose 部署，还要确认：
 
@@ -82,7 +82,7 @@ enable_paragraph_content = false
 这里的“直接部署”指的是：
 
 1. MaiBot 直接跑在宿主机上
-2. WebUI 监听本机 127.0.0.1:8001
+2. WebUI 监听本机 127.0.0.1:6001
 3. 宿主机安装 Caddy
 4. 由 Caddy 负责申请证书和 HTTPS 反代
 
@@ -92,7 +92,7 @@ enable_paragraph_content = false
 浏览器
   -> https://maibot.example.com
   -> Caddy :443
-  -> 127.0.0.1:8001
+  -> 127.0.0.1:6001
   -> MaiBot WebUI
 ```
 
@@ -126,7 +126,7 @@ brew install caddy
 
 ```caddyfile
 maibot.example.com {
-    reverse_proxy 127.0.0.1:8001
+    reverse_proxy 127.0.0.1:6001
 }
 ```
 
@@ -143,7 +143,7 @@ maibot.example.com {
         Referrer-Policy "strict-origin-when-cross-origin"
     }
 
-    reverse_proxy 127.0.0.1:8001
+    reverse_proxy 127.0.0.1:6001
 }
 ```
 
@@ -257,7 +257,7 @@ sudo journalctl -u caddy -f
 浏览器
   -> 宝塔站点 HTTPS
   -> 宝塔 Nginx/OpenResty 反向代理
-  -> 127.0.0.1:8001
+  -> 127.0.0.1:6001
   -> MaiBot WebUI
 ```
 
@@ -274,14 +274,14 @@ sudo journalctl -u caddy -f
 1. 进入对应站点。
 2. 打开反向代理。
 3. 新增反向代理。
-4. 目标 URL 填写 http://127.0.0.1:8001。
+4. 目标 URL 填写 http://127.0.0.1:6001。
 5. 发送域名通常保持目标域或原域名即可。
 
 如果使用的是宝塔站点配置文件，也可以手动补这一段：
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:8001;
+    proxy_pass http://127.0.0.1:6001;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -346,7 +346,7 @@ trusted_proxies = "127.0.0.1"
 浏览器
   -> 1Panel 网站/反向代理 HTTPS
   -> OpenResty/Nginx 反向代理
-  -> 127.0.0.1:8001 或 core:8001
+  -> 127.0.0.1:6001 或 core:6001
   -> MaiBot WebUI
 ```
 
@@ -355,11 +355,11 @@ trusted_proxies = "127.0.0.1"
 1. 登录 1Panel。
 2. 打开网站或反向代理管理。
 3. 新建网站，域名填 maibot.example.com。
-4. 添加反向代理规则，目标地址指向 http://127.0.0.1:8001。
+4. 添加反向代理规则，目标地址指向 http://127.0.0.1:6001。
 5. 开启 WebSocket 支持。
 6. 保存并重载站点配置。
 
-如果是在 Docker 环境里通过 1Panel 管理容器，目标地址也可以填写容器服务名，例如 http://core:8001，但前提是 1Panel 管理的网关容器与 MaiBot 在同一个 Docker 网络内。
+如果是在 Docker 环境里通过 1Panel 管理容器，目标地址也可以填写容器服务名，例如 http://core:6001，但前提是 1Panel 管理的网关容器与 MaiBot 在同一个 Docker 网络内。
 
 ### 7.3 在 1Panel 申请 Let's Encrypt 证书
 
@@ -406,7 +406,7 @@ Docker 模式下请使用：dashboard/docs/Caddyfile.docker.example
 
 1. 启用 Caddy 反向代理时，不应再把 core 的 8001 直接映射到公网
 2. 应由 Caddy 容器暴露 80 和 443
-3. Caddy 通过容器网络访问 core:8001
+3. Caddy 通过容器网络访问 core:6001
 
 ## 9. 常见问题
 
@@ -449,7 +449,7 @@ Docker 模式下请使用：dashboard/docs/Caddyfile.docker.example
 普通 Linux 服务器部署的推荐顺序如下：
 
 1. 宿主机直装 Caddy
-2. WebUI 绑定 127.0.0.1:8001
+2. WebUI 绑定 127.0.0.1:6001
 3. 域名指向服务器
 4. 用 Caddy 反代并自动管理 Let's Encrypt
 

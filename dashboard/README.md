@@ -276,7 +276,7 @@ bun run format
 // vite.config.ts
 proxy: {
   '/api': {
-    target: 'http://127.0.0.1:8001',
+    target: 'http://127.0.0.1:6001',
     changeOrigin: true,
     ws: true,  // WebSocket 支持
   },

@@ -8,5 +8,5 @@ maibot.example.com {
         Referrer-Policy "strict-origin-when-cross-origin"
     }
 
-    reverse_proxy core:8001
+    reverse_proxy core:6001
 }

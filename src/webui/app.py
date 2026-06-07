@@ -83,7 +83,7 @@ def _ensure_static_path_ready() -> Path | None:
 
 def create_app(
     host: str = "0.0.0.0",
-    port: int = 8001,
+    port: int = 6001,
     enable_static: bool = True,
 ) -> FastAPI:
     """

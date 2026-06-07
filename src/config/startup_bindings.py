@@ -19,8 +19,8 @@ class BindAddress:
     port: int
 
 
-_DEFAULT_MAIN_BIND_ADDRESS = BindAddress(host="127.0.0.1", port=8080)
-_DEFAULT_WEBUI_BIND_ADDRESS = BindAddress(host="127.0.0.1", port=8001)
+_DEFAULT_MAIN_BIND_ADDRESS = BindAddress(host="127.0.0.1", port=6000)
+_DEFAULT_WEBUI_BIND_ADDRESS = BindAddress(host="127.0.0.1", port=6001)
 
 
 def _as_mapping(value: Any) -> Optional[Mapping[str, Any]]:

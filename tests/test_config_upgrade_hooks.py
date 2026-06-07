@@ -53,12 +53,12 @@ def test_apply_config_upgrade_hooks_skips_versions_outside_upgrade_range(monkeyp
 
 
 def test_set_nested_config_value_can_keep_existing_value():
-    data = {"webui": {"port": 8001}}
+    data = {"webui": {"port": 6001}}
 
-    changed = set_nested_config_value(data, ("webui", "port"), 8080, force=False)
+    changed = set_nested_config_value(data, ("webui", "port"), 6080, force=False)
 
     assert changed is False
-    assert data["webui"]["port"] == 8001
+    assert data["webui"]["port"] == 6001
 
 
 def test_builtin_hook_resets_group_chat_prompt_when_upgrading_from_8_10_10():
@@ -72,5 +72,5 @@ def test_builtin_hook_resets_group_chat_prompt_when_upgrading_from_8_10_10():
 
 
 def test_bot_config_upgrade_hooks_register_group_chat_prompt_reset():
-    assert len(BOT_CONFIG_UPGRADE_HOOKS) == 1
+    assert len(BOT_CONFIG_UPGRADE_HOOKS) == 7
     assert BOT_CONFIG_UPGRADE_HOOKS[0].target_version == "8.10.11"

@@ -16,8 +16,8 @@ services:
 #      - EULA_AGREE=8e6e7d647f7f82d6ea98456b73908656 # 同意EULA
 #      - PRIVACY_AGREE=91e5db7659c560bc3545e63859b6ebc0 # 同意隐私条款
     ports:
-      - "18001:8001" # webui端口
-#      - "8000:8000"
+      - "16001:6001" # webui端口
+#      - "6000:6000"
     volumes:
       # 监听地址和端口已迁移到 ./docker-config/mmc/bot_config.toml 的 maim_message 与 webui 配置段
       - ./docker-config/mmc:/MaiMBot/config # 持久化bot配置文件
@@ -31,7 +31,7 @@ services:
     networks:
       - maim_bot
 
-  # 启用 HTTPS 时，建议注释掉 core 服务中的 "18001:8001" 端口映射，
+  # 启用 HTTPS 时，建议注释掉 core 服务中的 "16001:6001" 端口映射，
   # 然后取消注释此 Caddy 反向代理示例块，并按 dashboard/docs/Caddyfile.docker.example 修改域名。
   # caddy:
   #   image: caddy:2

@@ -12,10 +12,10 @@
 			"dockerDashComposeVersion": "latest"
 		}
 	},
-	// 同时转发 API 端口（8000）和 WebUI 面板端口（8001）
+	// 同时转发 API 端口（6000）和 WebUI 面板端口（6001）
 	"forwardPorts": [
-		8000,
-		8001
+		6000,
+		6001
 	],
 	// 开发环境变量：对齐生产部署的必要 env 设定
 	"containerEnv": {

@@ -33,7 +33,7 @@ class _ASGIProxy:
 class WebUIServer:
     """独立的 WebUI 服务器"""
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8001, register_config_reload: bool = True):
+    def __init__(self, host: str = "0.0.0.0", port: int = 6001, register_config_reload: bool = True):
         self.host = host
         self.port = port
         from src.webui.app import create_app, show_access_token
@@ -161,7 +161,7 @@ class WebUIServer:
 class ThreadedWebUIServer:
     """在专用线程中运行 WebUI，避免阻塞主事件循环。"""
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8001) -> None:
+    def __init__(self, host: str = "0.0.0.0", port: int = 6001) -> None:
         self.host = host
         self.port = port
         self._thread: threading.Thread | None = None
