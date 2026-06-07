@@ -69,14 +69,13 @@ const botConfigRoute = createRoute({
   component: lazyRouteComponent(() => import('./routes/config/bot'), 'BotConfigPage'),
 })
 
-// 配置路由 - 麦麦模型提供商配置
+// 配置路由 - 旧模型厂商配置入口，已合并到模型配置页
 const modelProviderConfigRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/config/modelProvider',
-  component: lazyRouteComponent(
-    () => import('./routes/config/modelProvider/index.tsx'),
-    'ModelProviderConfigPage'
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: '/config/model' })
+  },
 })
 
 // 配置路由 - 麦麦模型配置
@@ -91,6 +90,13 @@ const promptManagementRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/config/prompts',
   component: lazyRouteComponent(() => import('./routes/config/prompts'), 'PromptManagementPage'),
+})
+
+// 配置路由 - 人设生成器（测试功能）
+const promptGeneratorRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/config/prompt-generator',
+  component: lazyRouteComponent(() => import('./routes/prompt-generator'), 'PromptGeneratorPage'),
 })
 
 const adapterConfigRoute = createRoute({
@@ -166,7 +172,7 @@ const logsRoute = createRoute({
 const reasoningProcessRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/reasoning-process',
-  component: lazyRouteComponent(() => import('./routes/reasoning-process'), 'ReasoningProcessPage'),
+  component: lazyRouteComponent(() => import('./routes/logs'), 'ReasoningLogViewerPage'),
 })
 
 // MaiSaka 聊天流监控路由
@@ -282,6 +288,7 @@ const routeTree = rootRoute.addChildren([
     modelProviderConfigRoute,
     modelConfigRoute,
     promptManagementRoute,
+    promptGeneratorRoute,
     adapterConfigRoute,
     emojiManagementRoute,
     expressionManagementRoute,

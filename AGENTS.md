@@ -42,6 +42,7 @@
 
 # 配置文件修改
 如果你需要改动配置文件，不需要修改实际的bot_config.toml或者model_config.toml，只需要修改配置文件模版，并新增一个版本号即可，也不必要为配置改动创建测试文件。
+除非明确说明，否则不要擅自新增 ConfigUpgradeHook
 
 # Webui规范
 涉及显示聊天流信息的，优先显示聊天流实际名称（群名称或 xxx的私聊），而不是session_id
@@ -63,10 +64,16 @@
 # maibot插件开发文档
 https://github.com/Mai-with-u/maibot-plugin-sdk/blob/main/docs/guide.md
 
-如果你要编写插件，不要改动根目录的.gitignore，而是给插件所属的文件夹单独管理。
+如果你要编写插件，不要改动根目录的.gitignore，而是在/plugins下创建独立仓库，然后进行编写
 如果你要编写插件有需求需要改动主程序代码，请你先请求许可。
+
+# 修改文档
+如果有功能性的变更或者api或者开发变更，可以对根目录下/mai-docs进行修改，不要在上层目录新建内容
 
 # 如何提交maibot插件
 https://github.com/Mai-with-u/plugin-repo/blob/main/CONTRIBUTING.md
 
-# 对于changelog，建议分为两部分，一部分是用户感知功能侧，一部分是开发侧（包含修复和插件sdk,api改动）。最好一个功能一行，按模块分。
+# changelog编写
+建议分为两部分，一部分是用户感知功能侧，一部分是开发侧（包含修复和插件sdk,api改动）。最好一个功能一行，按模块分。
+一般不写入changelog的内容：
+版本号提升或更新项目依赖

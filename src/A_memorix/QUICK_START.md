@@ -110,6 +110,7 @@ refresh_interval_minutes = 30
 active_window_hours = 72
 max_refresh_per_cycle = 50
 top_k_evidence = 12
+evidence_classification_max_tokens = 1200
 
 [memory]
 enabled = true
@@ -130,6 +131,13 @@ max_file_size_mb = 20
 max_paste_chars = 200000
 default_file_concurrency = 2
 default_chunk_concurrency = 4
+
+[web.import.timeout]
+llm_call_seconds = 240
+process_poll_seconds = 1
+process_terminate_seconds = 5
+process_kill_seconds = 3
+convert_preflight_seconds = 20
 
 [web.tuning]
 enabled = true

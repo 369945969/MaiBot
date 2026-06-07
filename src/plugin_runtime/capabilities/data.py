@@ -1,21 +1,23 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import random
 import time
 
-from src.chat.message_receive.chat_manager import BotChatSession, chat_manager
-from src.common.data_models.image_data_model import MaiEmoji
 from src.common.logger import get_logger
-from src.common.utils.utils_image import ImageUtils
-from src.plugin_runtime.host.message_utils import PluginMessageUtils
+
+if TYPE_CHECKING:
+    from src.chat.message_receive.chat_manager import BotChatSession
+    from src.common.data_models.image_data_model import MaiEmoji
 
 logger = get_logger("plugin_runtime.integration")
 
 
 class RuntimeDataCapabilityMixin:
     @staticmethod
-    def _serialize_emoji_payload(emoji: MaiEmoji) -> Optional[Dict[str, str]]:
+    def _serialize_emoji_payload(emoji: "MaiEmoji") -> Optional[Dict[str, str]]:
+        from src.common.utils.utils_image import ImageUtils
+
         emoji_base64 = ImageUtils.image_path_to_base64(str(emoji.full_path))
         if not emoji_base64:
             return None
@@ -57,10 +59,25 @@ class RuntimeDataCapabilityMixin:
         return deduped_tags
 
     @staticmethod
-    def _normalize_emoji_tags(emoji: MaiEmoji) -> str:
+    def _normalize_emoji_tags(emoji: "MaiEmoji") -> str:
         """从表情包对象提取兼容旧数据的情绪标签文本。"""
         tags = RuntimeDataCapabilityMixin._normalize_emoji_tag_text(emoji.description or emoji.emotion)
         return tags[0] if tags else ""
+
+    @staticmethod
+    def _normalize_optional_bool(value: Any) -> Optional[bool]:
+        """将插件入参中的布尔值规范化，未提供时返回 None。"""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized_value = value.strip().lower()
+            if normalized_value in {"1", "true", "yes", "on"}:
+                return True
+            if normalized_value in {"0", "false", "no", "off"}:
+                return False
+        return bool(value)
 
     @staticmethod
     def _build_emoji_temp_path() -> Path:
@@ -210,7 +227,9 @@ class RuntimeDataCapabilityMixin:
             logger.error(f"[cap.database.count] 执行失败: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    def _list_sessions(self, platform: str, is_group_session: Optional[bool] = None) -> List[BotChatSession]:
+    def _list_sessions(self, platform: str, is_group_session: Optional[bool] = None) -> List["BotChatSession"]:
+        from src.chat.message_receive.chat_manager import chat_manager
+
         return [
             session
             for session in chat_manager.sessions.values()
@@ -219,13 +238,16 @@ class RuntimeDataCapabilityMixin:
         ]
 
     @staticmethod
-    def _serialize_stream(stream: BotChatSession) -> Dict[str, Any]:
+    def _serialize_stream(stream: "BotChatSession") -> Dict[str, Any]:
         return {
             "session_id": stream.session_id,
             "stream_id": stream.session_id,
             "platform": stream.platform,
             "user_id": stream.user_id,
+            "user_nickname": stream.user_nickname,
+            "user_cardname": stream.user_cardname,
             "group_id": stream.group_id,
+            "group_name": stream.group_name,
             "account_id": stream.account_id,
             "scope": stream.scope,
             "is_group_session": stream.is_group_session,
@@ -288,6 +310,8 @@ class RuntimeDataCapabilityMixin:
             return {"success": False, "error": "私聊会话缺少必要参数 user_id"}
 
         try:
+            from src.chat.message_receive.chat_manager import chat_manager
+
             existing_session_ids = chat_manager.resolve_session_ids_by_target(
                 platform=platform,
                 target_id=group_id if chat_type == "group" else user_id,
@@ -353,6 +377,8 @@ class RuntimeDataCapabilityMixin:
 
     @staticmethod
     def _serialize_messages(messages: list, include_binary_data: bool = True) -> List[Any]:
+        from src.plugin_runtime.host.message_utils import PluginMessageUtils
+
         result: List[Any] = []
         for msg in messages:
             if all(hasattr(msg, attr) for attr in ("message_id", "timestamp", "platform", "message_info", "raw_message")):
@@ -683,6 +709,8 @@ class RuntimeDataCapabilityMixin:
             return {"success": False, "error": "缺少必要参数 emoji_base64"}
 
         try:
+            from src.common.utils.utils_image import ImageUtils
+
             count_before = len(emoji_manager.emojis)
             temp_file_path = self._build_emoji_temp_path()
             if not ImageUtils.base64_to_image(emoji_base64, str(temp_file_path)):
@@ -744,13 +772,15 @@ class RuntimeDataCapabilityMixin:
             if emoji is None:
                 return {"success": False, "message": f"未找到表情包: {emoji_hash}", "hash": emoji_hash}
 
-            success = emoji_manager.delete_emoji(emoji, not bool(emoji.description and emoji.description.strip()))
+            keep_desc_arg = self._normalize_optional_bool(args.get("keep_desc"))
+            keep_desc = bool(emoji.description and emoji.description.strip()) if keep_desc_arg is None else keep_desc_arg
+            success = emoji_manager.delete_emoji(emoji, keep_desc=keep_desc)
             if not success:
                 return {"success": False, "message": f"删除表情包失败: {emoji_hash}", "hash": emoji_hash}
 
             emoji_manager.emojis = [item for item in emoji_manager.emojis if item.file_hash != emoji_hash]
             emoji_manager._emoji_num = len(emoji_manager.emojis)
-            return {"success": True, "message": f"成功删除表情包: {emoji_hash}", "hash": emoji_hash}
+            return {"success": True, "message": f"成功删除表情包: {emoji_hash}", "hash": emoji_hash, "keep_desc": keep_desc}
         except Exception as e:
             logger.error(f"[cap.emoji.delete] 执行失败: {e}", exc_info=True)
             return {"success": False, "error": str(e)}

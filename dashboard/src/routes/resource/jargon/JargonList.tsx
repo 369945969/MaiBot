@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { ThinkingIllustration } from '@/components/ui/thinking-illustration'
 import {
   Table,
   TableBody,
@@ -44,6 +45,22 @@ function renderJargonStatus(isJargon: boolean | null) {
   } else {
     return <Badge variant="outline"><HelpCircle className="h-3 w-3 mr-1" />未判定</Badge>
   }
+}
+
+function renderCreatedBy(createdBy: Jargon['created_by']) {
+  return createdBy === 'MANUAL' ? (
+    <Badge variant="outline">手动</Badge>
+  ) : (
+    <Badge variant="secondary">AI</Badge>
+  )
+}
+
+function formatJargonChatDisplay(jargon: Jargon) {
+  const chatNames = jargon.chat_names?.length ? jargon.chat_names : []
+  if (chatNames.length > 0) {
+    return chatNames.join('、')
+  }
+  return jargon.chat_name || jargon.session_id
 }
 
 /**
@@ -98,7 +115,7 @@ export function JargonList({
             {loading ? (
               <TableRow>
                 <TableCell colSpan={tableColSpan} className="text-center py-8 text-muted-foreground">
-                  Thinking...
+                  <ThinkingIllustration size="sm" className="mx-auto" />
                 </TableCell>
               </TableRow>
             ) : jargons.length === 0 ? (
@@ -126,11 +143,16 @@ export function JargonList({
                     {jargon.meaning || <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   {!hideChatColumn && (
-                    <TableCell className="max-w-[150px] truncate" title={jargon.chat_name || jargon.chat_id}>
-                      {jargon.chat_name || jargon.chat_id}
+                    <TableCell className="max-w-[150px] truncate" title={formatJargonChatDisplay(jargon)}>
+                      {formatJargonChatDisplay(jargon)}
                     </TableCell>
                   )}
-                  <TableCell>{renderJargonStatus(jargon.is_jargon)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {renderJargonStatus(jargon.is_jargon)}
+                      {renderCreatedBy(jargon.created_by)}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center">{jargon.count}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -171,7 +193,9 @@ export function JargonList({
       {/* 移动端卡片视图 */}
       <div className="md:hidden space-y-3 p-4">
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Thinking...</div>
+          <div className="text-center py-8 text-muted-foreground">
+            <ThinkingIllustration size="sm" className="mx-auto" />
+          </div>
         ) : jargons.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">暂无数据</div>
         ) : (
@@ -193,11 +217,12 @@ export function JargonList({
                   )}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     {renderJargonStatus(jargon.is_jargon)}
+                    {renderCreatedBy(jargon.created_by)}
                     <span className="text-muted-foreground">次数: {jargon.count}</span>
                   </div>
                   {!hideChatColumn && (
                     <div className="text-xs text-muted-foreground truncate">
-                      聊天: {jargon.chat_name || jargon.chat_id}
+                      聊天: {formatJargonChatDisplay(jargon)}
                     </div>
                   )}
                 </div>

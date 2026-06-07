@@ -1,7 +1,10 @@
 """推理过程日志浏览接口。"""
 
+from html import unescape
 from pathlib import Path
 from typing import Any
+import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -18,6 +21,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PROMPT_LOG_ROOT = (PROJECT_ROOT / "logs" / "maisaka_prompt").resolve()
 ALLOWED_SUFFIXES = {".txt", ".html"}
 SESSION_CHAT_TYPES = ("group", "private")
+PROMPT_METADATA_MARKER = "[请求信息]"
+PROMPT_SEPARATOR = "=" * 80
+PROMPT_METADATA_SCRIPT_PATTERN = re.compile(
+    r"<script[^>]*id=[\"']prompt-preview-metadata[\"'][^>]*>(?P<payload>.*?)</script>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 class ReasoningPromptStageInfo(BaseModel):
@@ -56,6 +65,9 @@ class ReasoningPromptFile(BaseModel):
     text_path: str | None = None
     html_path: str | None = None
     output_preview: str | None = None
+    action_preview: str | None = None
+    model_name: str | None = None
+    duration_ms: float | None = None
     size: int = 0
     modified_at: float = 0
 
@@ -88,6 +100,8 @@ class ReasoningPromptContentResponse(BaseModel):
     content: str
     size: int
     modified_at: float
+    model_name: str | None = None
+    duration_ms: float | None = None
 
 
 def _to_safe_relative_path(relative_path: str) -> Path:
@@ -301,13 +315,126 @@ def _fallback_session_display_name(name: str, parsed: tuple[str, str, str] | Non
     return f"{platform} {chat_type_label} {target_id}"
 
 
-def _extract_output_preview(file_path: Path, max_chars: int = 160) -> str | None:
-    """从新版 prompt 预览 txt 中提取输出结果摘要。"""
+def _parse_metadata_value(line: str) -> tuple[str, str] | None:
+    """解析请求信息行中的键值对。"""
 
+    normalized_line = line.strip()
+    if not normalized_line:
+        return None
+
+    for separator in ("：", ":"):
+        if separator not in normalized_line:
+            continue
+        key, value = normalized_line.split(separator, 1)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            return key, value
+    return None
+
+
+def _parse_duration_ms(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return round(float(value), 2)
+
+    duration_text = str(value or "").strip()
+    if not duration_text:
+        return None
+
+    match = re.search(r"-?\d+(?:\.\d+)?", duration_text)
+    if not match:
+        return None
+
+    try:
+        return round(float(match.group(0)), 2)
+    except ValueError:
+        return None
+
+
+def _normalize_prompt_metadata(raw_metadata: dict[str, Any]) -> dict[str, object]:
+    """归一化 prompt 预览元数据字段。"""
+
+    metadata: dict[str, object] = {}
+    model_name = str(raw_metadata.get("model_name") or raw_metadata.get("model") or "").strip()
+    if model_name:
+        metadata["model_name"] = model_name
+
+    duration_ms = _parse_duration_ms(raw_metadata.get("duration_ms"))
+    if duration_ms is not None:
+        metadata["duration_ms"] = duration_ms
+
+    return metadata
+
+
+def _extract_prompt_metadata_from_text(content: str) -> dict[str, object]:
+    """从 prompt 原始文本中提取请求模型与推理耗时。"""
+
+    marker_index = content.find(PROMPT_METADATA_MARKER)
+    if marker_index < 0:
+        return {}
+
+    metadata_text = content[marker_index + len(PROMPT_METADATA_MARKER) :]
+    separator_index = metadata_text.find(PROMPT_SEPARATOR)
+    if separator_index >= 0:
+        metadata_text = metadata_text[:separator_index]
+
+    raw_metadata: dict[str, Any] = {}
+    for line in metadata_text.splitlines():
+        parsed_value = _parse_metadata_value(line)
+        if parsed_value is None:
+            continue
+
+        key, value = parsed_value
+        if key in {"请求模型", "模型"}:
+            raw_metadata["model_name"] = value
+        elif key in {"推理耗时", "请求耗时", "耗时"}:
+            raw_metadata["duration_ms"] = value
+
+    return _normalize_prompt_metadata(raw_metadata)
+
+
+def _extract_prompt_metadata_from_html(content: str) -> dict[str, object]:
+    """从 prompt HTML 预览中提取请求模型与推理耗时。"""
+
+    match = PROMPT_METADATA_SCRIPT_PATTERN.search(content)
+    if match:
+        try:
+            raw_metadata = json.loads(unescape(match.group("payload")).strip())
+        except (TypeError, ValueError, json.JSONDecodeError):
+            raw_metadata = {}
+        if isinstance(raw_metadata, dict):
+            metadata = _normalize_prompt_metadata(raw_metadata)
+            if metadata:
+                return metadata
+
+    # 兼容未来或手写 HTML 中直接暴露出的文本。
+    plain_text = unescape(re.sub(r"<[^>]+>", "\n", content))
+    return _extract_prompt_metadata_from_text(plain_text)
+
+
+def _extract_prompt_metadata(file_path: Path) -> dict[str, object]:
     try:
         content = file_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return None
+        return {}
+
+    if file_path.suffix.lower() == ".html":
+        return _extract_prompt_metadata_from_html(content)
+    return _extract_prompt_metadata_from_text(content)
+
+
+def _merge_prompt_metadata(record: dict[str, object], metadata: dict[str, object]) -> None:
+    model_name = str(metadata.get("model_name") or "").strip()
+    if model_name and not record.get("model_name"):
+        record["model_name"] = model_name
+
+    duration_ms = metadata.get("duration_ms")
+    if isinstance(duration_ms, (int, float)) and record.get("duration_ms") is None:
+        record["duration_ms"] = float(duration_ms)
+
+
+def _extract_output_block_from_content(content: str) -> str | None:
+    """从新版 prompt 预览 txt 内容中提取原始输出结果区块。"""
 
     marker = "[输出结果]"
     marker_index = content.find(marker)
@@ -315,17 +442,135 @@ def _extract_output_preview(file_path: Path, max_chars: int = 160) -> str | None
         return None
 
     output_text = content[marker_index + len(marker) :]
-    separator_index = output_text.find("================================================================================")
+    separator_index = output_text.find(PROMPT_SEPARATOR)
     if separator_index >= 0:
         output_text = output_text[:separator_index]
 
+    output_text = output_text.strip()
+    if not output_text:
+        return None
+
+    return output_text
+
+
+def _extract_output_text_from_content(content: str) -> str | None:
+    """从新版 prompt 预览 txt 内容中提取完整输出结果。"""
+
+    output_text = _extract_output_block_from_content(content)
+    if not output_text:
+        return None
+
     normalized_output = " ".join(line.strip() for line in output_text.splitlines() if line.strip())
+    if not normalized_output:
+        return None
+
+    return normalized_output
+
+
+def _extract_output_text(file_path: Path) -> str | None:
+    """从新版 prompt 预览 txt 中提取完整输出结果。"""
+
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    return _extract_output_text_from_content(content)
+
+
+def _extract_output_preview(file_path: Path, max_chars: int = 160) -> str | None:
+    """从新版 prompt 预览 txt 中提取输出结果摘要。"""
+
+    normalized_output = _extract_output_text(file_path)
     if not normalized_output:
         return None
 
     if len(normalized_output) <= max_chars:
         return normalized_output
     return f"{normalized_output[:max_chars].rstrip()}..."
+
+
+def _extract_action_names_from_output(output_text: str) -> list[str]:
+    """从输出结果中提取实际调用的动作名称。"""
+
+    marker = "工具调用:"
+    marker_index = output_text.find(marker)
+    if marker_index < 0:
+        return []
+
+    raw_tool_calls = output_text[marker_index + len(marker) :].strip()
+    if not raw_tool_calls:
+        return []
+
+    try:
+        parsed_tool_calls, _ = json.JSONDecoder().raw_decode(raw_tool_calls)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+    if isinstance(parsed_tool_calls, dict):
+        parsed_tool_calls = [parsed_tool_calls]
+    if not isinstance(parsed_tool_calls, list):
+        return []
+
+    action_names: list[str] = []
+    for tool_call in parsed_tool_calls:
+        if not isinstance(tool_call, dict):
+            continue
+        action_name = str(tool_call.get("name") or "").strip()
+        if action_name:
+            action_names.append(action_name)
+    return action_names
+
+
+def _extract_action_preview(file_path: Path, max_actions: int = 4) -> str | None:
+    """从 prompt 预览 txt 中提取动作摘要。"""
+
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    output_text = _extract_output_block_from_content(content)
+    if not output_text:
+        return None
+
+    action_names = _extract_action_names_from_output(output_text)
+    if not action_names:
+        return None
+
+    shown_actions = action_names[:max_actions]
+    preview = f"动作：{'、'.join(shown_actions)}"
+    if len(action_names) > max_actions:
+        preview = f"{preview} 等 {len(action_names)} 个"
+    return preview
+
+
+def _matches_prompt_file_search(item: ReasoningPromptFile, normalized_search: str) -> bool:
+    """判断推理过程条目是否匹配搜索词。"""
+
+    if (
+        normalized_search in item.stage.casefold()
+        or normalized_search in item.session_id.casefold()
+        or normalized_search in (item.session_display_name or "").casefold()
+        or normalized_search in (item.resolved_session_id or "").casefold()
+        or normalized_search in (item.output_preview or "").casefold()
+        or normalized_search in (item.action_preview or "").casefold()
+        or normalized_search in (item.model_name or "").casefold()
+        or normalized_search in (str(item.duration_ms) if item.duration_ms is not None else "")
+        or normalized_search in item.stem.casefold()
+    ):
+        return True
+
+    if item.stage != "replyer" or not item.text_path:
+        return False
+
+    try:
+        file_path = _resolve_prompt_log_path(item.text_path, {".txt"})
+    except HTTPException:
+        return False
+
+    output_text = _extract_output_text(file_path)
+    return normalized_search in (output_text or "").casefold()
 
 
 def _resolve_reasoning_session_info(
@@ -431,6 +676,9 @@ def _collect_prompt_files(
                 "text_path": None,
                 "html_path": None,
                 "output_preview": None,
+                "action_preview": None,
+                "model_name": None,
+                "duration_ms": None,
                 "size": 0,
                 "modified_at": 0.0,
             },
@@ -440,10 +688,14 @@ def _collect_prompt_files(
 
         if file_path.suffix.lower() == ".txt":
             record["text_path"] = _relative_posix_path(file_path)
+            _merge_prompt_metadata(record, _extract_prompt_metadata(file_path))
             if stage_name == "replyer":
                 record["output_preview"] = _extract_output_preview(file_path)
+            elif stage_name in {"planner", "timing_gate"}:
+                record["action_preview"] = _extract_action_preview(file_path)
         elif file_path.suffix.lower() == ".html":
             record["html_path"] = _relative_posix_path(file_path)
+            _merge_prompt_metadata(record, _extract_prompt_metadata(file_path))
 
     items = [ReasoningPromptFile(**record) for record in records.values()]
     items.sort(key=lambda item: (item.modified_at, item.timestamp or 0), reverse=True)
@@ -476,23 +728,14 @@ async def list_reasoning_prompt_files(
     selected_stage = _resolve_stage_name(stage)
     sessions = _list_session_names(selected_stage)
     selected_session = _resolve_session_name(session, sessions)
-    normalized_search = search.strip().lower()
-    sessions_to_resolve = sessions if normalized_search else ([selected_session] if selected_session else [])
-    session_infos = _list_session_infos(selected_stage, sessions_to_resolve)
+    normalized_search = search.strip().casefold()
+    # 下拉菜单需要展示全部会话的真实名称，不能只解析当前选中项。
+    session_infos = _list_session_infos(selected_stage, sessions)
     session_info_map = {item.name: item for item in session_infos}
     items = _collect_prompt_files(selected_stage, selected_session, session_info_map)
 
     if normalized_search:
-        items = [
-            item
-            for item in items
-            if normalized_search in item.stage.lower()
-            or normalized_search in item.session_id.lower()
-            or normalized_search in (item.session_display_name or "").lower()
-            or normalized_search in (item.resolved_session_id or "").lower()
-            or normalized_search in (item.output_preview or "").lower()
-            or normalized_search in item.stem.lower()
-        ]
+        items = [item for item in items if _matches_prompt_file_search(item, normalized_search)]
 
     total = len(items)
     start = (page - 1) * page_size
@@ -517,12 +760,15 @@ async def get_reasoning_prompt_file(path: str = Query(...)):
 
     file_path = _resolve_prompt_log_path(path, {".txt"})
     stat = file_path.stat()
+    metadata = _extract_prompt_metadata(file_path)
 
     return ReasoningPromptContentResponse(
         path=_relative_posix_path(file_path),
         content=file_path.read_text(encoding="utf-8", errors="replace"),
         size=stat.st_size,
         modified_at=stat.st_mtime,
+        model_name=metadata.get("model_name") if isinstance(metadata.get("model_name"), str) else None,
+        duration_ms=metadata.get("duration_ms") if isinstance(metadata.get("duration_ms"), float) else None,
     )
 
 
